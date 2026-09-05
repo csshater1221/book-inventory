@@ -69,13 +69,20 @@ export async function bumpScanCount(uid, isbn) {
  * duplicating.
  */
 export async function saveBook(uid, book) {
+  // A "local" cover's coverUrl is a blob: URL, only valid in this tab for
+  // this session — the actual photo lives in IndexedDB (see coverStorage.js),
+  // keyed by ISBN. Firestore only needs to know a local cover exists;
+  // BookCard resolves the real image on each device separately via
+  // useLocalCover, falling back to the placeholder where it's absent.
+  const coverUrl = book.coverSource === 'local' ? null : book.coverUrl || null
+
   await setDoc(bookDoc(uid, book.isbn), {
     isbn: book.isbn,
     title: book.title.trim(),
     author: book.author.trim(),
     series: book.series?.trim() || null,
     volume: book.volume === '' || book.volume == null ? null : Number(book.volume),
-    coverUrl: book.coverUrl || null,
+    coverUrl,
     coverSource: book.coverSource || 'none',
     source: book.source,
     scanCount: 1,

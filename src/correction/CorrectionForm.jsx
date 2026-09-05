@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import SeriesAutocomplete from './SeriesAutocomplete.jsx'
-import { uploadCoverPhoto } from '../storage/coverUpload.js'
+import { saveCoverLocally } from '../storage/coverStorage.js'
 
 /**
  * Shown after every successful lookup (not just misses) — Google Books
@@ -8,31 +8,35 @@ import { uploadCoverPhoto } from '../storage/coverUpload.js'
  * volume, so this screen is the normal path for completing that data,
  * not just an error-recovery fallback.
  */
-export default function CorrectionForm({ uid, draft, existingSeriesNames, onSave, onCancel }) {
+export default function CorrectionForm({ draft, existingSeriesNames, onSave, onCancel }) {
   const [title, setTitle] = useState(draft.title)
   const [author, setAuthor] = useState(draft.author)
   const [series, setSeries] = useState(draft.series ?? '')
   const [volume, setVolume] = useState(draft.volume ?? '')
   const [coverUrl, setCoverUrl] = useState(draft.coverUrl)
   const [coverSource, setCoverSource] = useState(draft.coverUrl ? 'api' : 'none')
-  const [uploadingCover, setUploadingCover] = useState(false)
+  const [savingCover, setSavingCover] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
+  // Saved to IndexedDB immediately (keyed by ISBN) rather than waiting for
+  // the final "Save to library" submit — keeps the flow simple, at the
+  // minor cost of an orphaned local blob if the user takes a photo then
+  // cancels the form entirely. Harmless for a personal-scale library.
   async function handlePhotoSelected(e) {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploadingCover(true)
+    setSavingCover(true)
     setError(null)
     try {
-      const url = await uploadCoverPhoto(uid, draft.isbn, file)
-      setCoverUrl(url)
-      setCoverSource('upload')
+      await saveCoverLocally(draft.isbn, file)
+      setCoverUrl(URL.createObjectURL(file))
+      setCoverSource('local')
     } catch (err) {
-      console.error('Cover upload failed', err)
-      setError('Could not upload that photo. You can still save without a cover.')
+      console.error('Local cover save failed', err)
+      setError('Could not save that photo on this device. You can still save without a cover.')
     } finally {
-      setUploadingCover(false)
+      setSavingCover(false)
     }
   }
 
@@ -73,13 +77,13 @@ export default function CorrectionForm({ uid, draft, existingSeriesNames, onSave
           </div>
         )}
         <label className="photo-button">
-          {uploadingCover ? 'Uploading…' : coverUrl ? 'Replace cover photo' : 'Take a photo'}
+          {savingCover ? 'Saving…' : coverUrl ? 'Replace cover photo' : 'Take a photo'}
           <input
             type="file"
             accept="image/*"
             capture="environment"
             onChange={handlePhotoSelected}
-            disabled={uploadingCover}
+            disabled={savingCover}
             hidden
           />
         </label>
@@ -126,7 +130,7 @@ export default function CorrectionForm({ uid, draft, existingSeriesNames, onSave
         <button type="button" className="secondary" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
-        <button type="submit" className="primary" disabled={saving || uploadingCover}>
+        <button type="submit" className="primary" disabled={saving || savingCover}>
           {saving ? 'Saving…' : 'Save to library'}
         </button>
       </div>
