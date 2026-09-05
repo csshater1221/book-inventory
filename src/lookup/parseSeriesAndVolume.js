@@ -11,6 +11,7 @@
  *   "Mistborn #3"               -> series: "Mistborn", volume: 3
  *   "Mistborn (Mistborn, #3)"   -> series: "Mistborn", volume: 3
  *   "Mistborn 3: The Well..."   -> series: "Mistborn", volume: 3
+ *   "Series 10 (Light Novel)"   -> series: "Series (Light Novel)", volume: 10
  *
  * Anything that doesn't match one of these shapes returns nulls for both,
  * and the field is left for the user to fill in by hand.
@@ -39,14 +40,17 @@ export function parseSeriesAndVolume(rawTitle) {
     return { series: hashMatch[1].trim(), volume: Number(hashMatch[2]) }
   }
 
-  // "Series 3: Subtitle" or bare "Series 3" — trailing number, optionally
-  // followed by a colon-introduced subtitle. Deliberately last/loosest,
-  // since a bare trailing number is the easiest to false-positive on
-  // (e.g. a one-off title that just happens to end in a year).
-  const trailingNumberMatch = title.match(/^(.*\S)\s+(\d{1,3})(?::.*)?$/)
+  // "Series 3: Subtitle" or bare "Series 3" or "Series 3 (Light Novel)"
+  // Optional trailing qualifier (e.g. "(Light Novel)", "[LN]") supported.
+  const trailingNumberMatch = title.match(/^(.*\S)\s+(\d{1,3})(?::.*)?(?:\s+(\([^)]+\)|\[[^\]]+\]))?$/)
   if (trailingNumberMatch) {
-    return { series: trailingNumberMatch[1].trim(), volume: Number(trailingNumberMatch[2]) }
+    const mainSeries = trailingNumberMatch[1].trim()
+    const qualifier = trailingNumberMatch[3] ? ` ${trailingNumberMatch[3].trim()}` : ''
+    return {
+      series: `${mainSeries}${qualifier}`,
+      volume: Number(trailingNumberMatch[2])
+    }
   }
 
-  return { series: null, volume: null }
+  return { series: title, volume: null }
 }
