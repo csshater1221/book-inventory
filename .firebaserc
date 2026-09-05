@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID"
-  }
+    "default": "book-scanner-ba74d",
+    "claude-version": "book-scanner-ba74d"
+  },
+  "targets": {},
+  "etags": {}
 }
