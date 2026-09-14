@@ -1,40 +1,74 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import SeriesAutocomplete from './SeriesAutocomplete.jsx'
+import ConfirmDeleteDialog from './ConfirmDeleteDialog.jsx'
 import { saveCoverLocally } from '../storage/coverStorage.js'
+import { uploadCoverImage } from '../storage/coverSync.js'
+import { resizeCoverImage } from '../storage/resizeCoverImage.js'
+import { useCover } from '../storage/useCover.js'
 
 /**
  * Shown after every successful lookup (not just misses) — Google Books
  * and Open Library frequently return a title/author but no series or
  * volume, so this screen is the normal path for completing that data,
  * not just an error-recovery fallback.
+ *
+ * Also reused for editing a book already in the library (see
+ * LibraryPage): pass onDelete to enable the "Remove from library" flow,
+ * and submitLabel to relabel the primary button ("Save changes" vs the
+ * default "Save to library").
  */
-export default function CorrectionForm({ draft, existingSeriesNames, onSave, onCancel }) {
+export default function CorrectionForm({
+  uid,
+  draft,
+  existingSeriesNames,
+  onSave,
+  onCancel,
+  onDelete,
+  submitLabel = 'Save to library'
+}) {
   const [title, setTitle] = useState(draft.title)
   const [author, setAuthor] = useState(draft.author)
   const [series, setSeries] = useState(draft.series ?? '')
   const [volume, setVolume] = useState(draft.volume ?? '')
   const [coverUrl, setCoverUrl] = useState(draft.coverUrl)
-  const [coverSource, setCoverSource] = useState(draft.coverUrl ? 'api' : 'none')
+  const [coverSource, setCoverSource] = useState(draft.coverUrl ? 'api' : draft.coverSource ?? 'none')
   const [savingCover, setSavingCover] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  // Saved to IndexedDB immediately (keyed by ISBN) rather than waiting for
-  // the final "Save to library" submit — keeps the flow simple, at the
-  // minor cost of an orphaned local blob if the user takes a photo then
-  // cancels the form entirely. Harmless for a personal-scale library.
+  // Editing a book whose cover is a device photo: pull it in cache-first
+  // (this device's IndexedDB, then the synced Firestore copy — see
+  // useCover.js) to show what's already there. No-ops for the new-scan
+  // flow, where coverSource isn't "photo" yet.
+  const existingPhotoCoverUrl = useCover(uid, draft.isbn, draft.coverSource === 'photo' && !draft.coverUrl)
+  useEffect(() => {
+    if (existingPhotoCoverUrl && !coverUrl) {
+      setCoverUrl(existingPhotoCoverUrl)
+    }
+  }, [existingPhotoCoverUrl])
+
+  // Resized/compressed client-side first (see resizeCoverImage.js), then
+  // written to IndexedDB immediately for a fast local preview, and
+  // synced to Firestore so it's there when this book is opened on
+  // another device. Both happen before the final "Save to library"
+  // submit — simplest flow, at the minor cost of an orphaned cover (in
+  // IndexedDB and Firestore) if the user takes a photo then cancels the
+  // form entirely. Harmless for a personal-scale library.
   async function handlePhotoSelected(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setSavingCover(true)
     setError(null)
     try {
-      await saveCoverLocally(draft.isbn, file)
-      setCoverUrl(URL.createObjectURL(file))
-      setCoverSource('local')
+      const { blob, dataUrl } = await resizeCoverImage(file)
+      await saveCoverLocally(draft.isbn, blob)
+      setCoverUrl(URL.createObjectURL(blob))
+      setCoverSource('photo')
+      await uploadCoverImage(uid, draft.isbn, dataUrl)
     } catch (err) {
-      console.error('Local cover save failed', err)
-      setError('Could not save that photo on this device. You can still save without a cover.')
+      console.error('Cover save/sync failed', err)
+      setError('Could not save that photo. You can still save without a cover, or try again.')
     } finally {
       setSavingCover(false)
     }
@@ -64,6 +98,13 @@ export default function CorrectionForm({ draft, existingSeriesNames, onSave, onC
       setError('Could not save this book. Check your connection and try again.')
       setSaving(false)
     }
+  }
+
+  async function handleConfirmDelete() {
+    await onDelete()
+    // No need to reset confirmingDelete on success — the parent unmounts
+    // this form once the delete completes. It only matters on failure,
+    // where ConfirmDeleteDialog itself re-enables its button.
   }
 
   return (
@@ -131,9 +172,27 @@ export default function CorrectionForm({ draft, existingSeriesNames, onSave, onC
           Cancel
         </button>
         <button type="submit" className="primary" disabled={saving || savingCover}>
-          {saving ? 'Saving…' : 'Save to library'}
+          {saving ? 'Saving…' : submitLabel}
         </button>
       </div>
+
+      {onDelete && (
+        <button
+          type="button"
+          className="link-button danger-link"
+          onClick={() => setConfirmingDelete(true)}
+        >
+          Remove this book from your library
+        </button>
+      )}
+
+      {confirmingDelete && (
+        <ConfirmDeleteDialog
+          title={title}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </form>
   )
 }

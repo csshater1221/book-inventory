@@ -139,6 +139,7 @@ export default function ScanPage({ books }) {
 
       {status === STATUS.CORRECTING && draft ? (
         <CorrectionForm
+          uid={user.uid}
           draft={draft}
           existingSeriesNames={existingSeriesNames}
           onSave={handleSave}

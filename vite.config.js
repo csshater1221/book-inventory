@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Personal weekend-project PWA: book inventory scanner.
+// Personal weekend-project PWA: readr, a book inventory scanner.
 // The service worker only precaches the app shell — book data lives in
 // Firestore, and we deliberately do NOT cache Google Books / Open Library
 // API responses, since stale lookup data is worse than a failed lookup.
@@ -13,11 +13,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
-        name: 'Book Inventory',
-        short_name: 'Books',
+        name: 'readr',
+        short_name: 'readr',
         description: 'Scan ISBNs to track the books you already own.',
-        theme_color: '#2F5D50',
-        background_color: '#EFEAE0',
+        theme_color: '#B9A6E8',
+        background_color: '#F6F3FC',
         display: 'standalone',
         start_url: '/',
         icons: [

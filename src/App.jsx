@@ -25,7 +25,7 @@ function SignedInApp({ user, logout }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="app-title">Book Inventory</span>
+        <span className="app-title">readr</span>
         <button className="link-button" onClick={logout}>
           Sign out
         </button>

@@ -1,4 +1,4 @@
-# Book Inventory
+# readr
 
 Scan the ISBNs of books you own so you don't buy duplicates. A PWA — installable
 on your phone, works from a browser tab too.
@@ -7,10 +7,22 @@ on your phone, works from a browser tab too.
   price add-on some books print next to it.
 - **Lookup**: Google Books → Open Library → manual entry if both miss.
 - **Correction screen**: always shown after a lookup, since series/volume are
-  rarely in the API data. Prefilled with a best-effort guess at series name
-  and volume number parsed from the title (see `parseSeriesAndVolume.js`) —
-  always editable, since it's a heuristic, not a guarantee. Series field has
-  autocomplete from your own library.
+  rarely both present. Series name is pulled from Open Library's per-edition
+  catalog record when it has one (a real cataloged name, not a guess) —
+  Google Books has no equivalent field to check, only an internal ID with
+  no human-readable name attached. When there's no catalog series either,
+  it falls back to a best-effort guess parsed out of the title (see
+  `parseSeriesAndVolume.js`), including spelled-out numbers ("Five" as well
+  as "5"). Either way it's always editable — a guess or a catalog value can
+  still be wrong. Series field has autocomplete from your own library.
+- **Editing and removing books**: tap any book in the Library view to reopen
+  the same correction form pre-filled with its current data — this is also
+  how you backfill a series/volume on a book that was scanned before either
+  was filled in (which is what actually drives the volume sort below; the
+  sort logic itself has always used volume, it just needs the data). From
+  there you can also remove the book entirely, behind a confirmation dialog
+  whose confirm button stays disabled for a few seconds so a stray tap can't
+  delete something by accident.
 - **Debug panel**: collapsible panel at the bottom of the Scan screen —
   shows each scanned ISBN, whether it was a hit/miss/duplicate/error, and
   the raw lookup response. Session-only, not persisted.
@@ -18,16 +30,20 @@ on your phone, works from a browser tab too.
   re-asking you to fill in details.
 - **Library**: grouped by series (alphabetical), sorted by volume within a
   series; books with no series sit in "Standalone."
-- **Cover photos**: API cover if one's found; otherwise you can take a photo,
-  stored on-device in IndexedDB (not the cloud — see note below).
+- **Cover photos**: API cover if one's found; otherwise take a photo,
+  resized/compressed on-device and synced through Firestore, with an
+  IndexedDB cache on each device so it loads instantly once fetched once
+  (see note below).
 
-> **Cover photos are local to the device that took them.** Firebase Storage
-> now requires the paid Blaze plan for new projects, so this is a deliberate
-> trade-off for a spend-nothing project: a photo you take stays on that
-> phone. Open the library on another device, or clear this device's site
-> data, and that book just falls back to the initial-letter placeholder — the
-> rest of its data (title, author, series, volume) is unaffected, since only
-> the photo itself is local. Worth mentioning to whoever else uses this.
+> **Cover photos sync through Firestore, cached locally per device.** A
+> photo you take is resized client-side, cached in this device's
+> IndexedDB, and uploaded as base64 to its own Firestore doc (kept
+> separate from the book's own doc — see `coverSync.js` — so the library
+> listener never has to transfer image bytes for books you're not
+> looking at). Opening that book on another device fetches it from
+> Firestore once and caches it there too. If you're offline when you
+> take the photo, or Firestore write fails, the local cache still shows
+> it on that device — it just hasn't synced yet.
 
 ## 1. Local setup
 
@@ -51,9 +67,12 @@ You'll fill in `.env.local` in step 2, after creating the Firebase project.
    (the rules in this repo lock it down properly — see below) → pick any
    region close to you.
 
-No Firebase Storage setup needed — cover photos are stored on-device
-(IndexedDB), not in the cloud, since Storage now requires the paid Blaze
-plan for new projects.
+No Firebase Storage setup needed — cover photos sync as base64 through
+Firestore itself (see `coverSync.js`), not Cloud Storage, since Storage
+now requires the paid Blaze plan for new projects. Firestore's free Spark
+tier comfortably covers this: 1 GiB storage, 50K reads/20K writes per day
+— a resized cover is tens of KB, and reads/writes are billed by operation
+count, not by bytes.
 
 ## 3. Firebase CLI: install, login, deploy
 
@@ -133,12 +152,17 @@ camera.
 ```
 src/
 ├── auth/          Google sign-in state (AuthContext)
-├── lookup/        ISBN → book data: Google Books, Open Library, and the
-│                  cascade that falls back to manual entry
+├── lookup/        ISBN → book data: Google Books, Open Library (title/
+│                  author/cover), a separate Open Library catalog-series
+│                  lookup, and the cascade that ties them together with a
+│                  title-parsing fallback
 ├── scanner/       Camera barcode reader (html5-qrcode, EAN-13 only)
 ├── correction/    The always-shown form for confirming/fixing lookup
-│                  results, incl. series autocomplete
-├── storage/       Cover photo storage — IndexedDB wrapper, on-device only
+│                  results, incl. series autocomplete and (for existing
+│                  books) delete-with-confirmation
+├── storage/       Cover photos: client-side resize/compress, an
+│                  IndexedDB local cache, and Firestore sync (its own
+│                  per-image collection, kept separate from `books`)
 ├── library/       Firestore reads/writes, and the grouping/sorting logic
 │                  for the library view
 └── pages/         Login, Scan, Library — the three screens
@@ -146,26 +170,23 @@ src/
 
 ## What to extend first
 
-- **Manual correction on existing books.** Right now you can only fix
-  title/author/series/volume the moment you scan a book — there's no way to
-  edit a book already in your library. Tapping a `BookCard` to reopen
-  `CorrectionForm` pre-filled with its current data is the natural next
-  step, and most of the form is already reusable as-is.
 - **Faster series entry for a whole shelf.** If you're batch-scanning book 1
   through 6 of the same series back to back, retyping the series name each
   time is annoying. Remembering the last-used series (and pre-filling
   volume = previous + 1) would make that much faster.
-- **Shared libraries.** The Firestore/Storage rules currently isolate each
-  user completely — `users/{uid}/books/{isbn}`. If you and friends want to
-  see each other's collections (to avoid duplicate *gift* buying, say), that
-  means either a shared top-level collection with an `ownerId` field, or a
-  rules change to allow read access to specific other UIDs.
+- **Shared libraries.** The Firestore rules currently isolate each user
+  completely — `users/{uid}/books/{isbn}` and `users/{uid}/coverImages/{isbn}`
+  both check `request.auth.uid == userId`. This is exactly the piece we're
+  holding off on for now (see conversation) — whichever sharing model gets
+  picked, it's a rules change plus some UI, not a rewrite.
 - **Offline queueing.** If you scan books somewhere with no signal, lookups
   and Firestore writes will currently just fail. Queuing scanned ISBNs
   locally (e.g. in IndexedDB) and resolving/saving them once back online
   would make the PWA genuinely usable offline, not just installable.
-- **Orphaned local covers.** A photo is written to IndexedDB the moment
-  you take it, before you hit "Save to library" — if you cancel the form
-  after taking a photo, that blob is left behind under its ISBN key. Not a
-  real problem at personal-library scale, but `deleteCoverLocally` (already
-  in `coverStorage.js`) is there if you want `onCancel` to clean it up.
+- **Orphaned covers on cancel.** A photo is written to IndexedDB and
+  Firestore's `coverImages` the moment you take it, before you hit "Save
+  to library" — if you cancel the form after taking a photo, that data is
+  left behind under its ISBN key in both places. Not a real problem at
+  personal-library scale, but `deleteCoverLocally`/`deleteCoverImage`
+  (already in `coverStorage.js`/`coverSync.js`) are there if you want
+  `onCancel` to clean them up.

@@ -1,12 +1,20 @@
 :root {
-  --ink: #232323;
-  --parchment: #EFEAE0;
+  --ink: #2C2436;
+  --parchment: #F6F3FC;
   --surface: #FFFFFF;
-  --border: #DDD5C4;
-  --spine-green: #2F5D50;
-  --spine-green-dark: #234840;
-  --foil-gold: #C98A2C;
-  --danger: #B3432B;
+  --border: #E1D9F0;
+  --primary: #B9A6E8;
+  --primary-dark: #4A3B6B;
+  --primary-on: #3B2E52;
+  --accent-bg: #FBEADC;
+  --accent-text: #8A5A33;
+  --success: #A9CDB0;
+  --success-bg: #E9F3EA;
+  --success-text: #2F4A34;
+  --danger: #D98CA0;
+  --danger-on: #4B1F2A;
+  --danger-bg: #FBE7EC;
+  --danger-text: #A84867;
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
 }
@@ -35,7 +43,7 @@ input {
 }
 
 :focus-visible {
-  outline: 3px solid var(--foil-gold);
+  outline: 3px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -68,7 +76,7 @@ input {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1.3rem;
-  color: var(--spine-green-dark);
+  color: var(--primary-dark);
 }
 
 .link-button {
@@ -109,9 +117,9 @@ input {
 
 .tab.active {
   opacity: 1;
-  color: var(--spine-green-dark);
+  color: var(--primary-dark);
   font-weight: 600;
-  border-top: 2px solid var(--spine-green);
+  border-top: 2px solid var(--primary);
   margin-top: -1px;
 }
 
@@ -130,7 +138,7 @@ input {
 
 .login-page h1 {
   font-family: var(--font-display);
-  color: var(--spine-green-dark);
+  color: var(--primary-dark);
   margin-bottom: 0;
 }
 
@@ -154,12 +162,12 @@ input {
 }
 
 .primary {
-  background: var(--spine-green);
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-on);
 }
 
 .primary:disabled {
-  background: #9DB3AC;
+  background: #DCD3F0;
   cursor: default;
 }
 
@@ -167,6 +175,29 @@ input {
   background: transparent;
   border-color: var(--border);
   color: var(--ink);
+}
+
+.danger {
+  background: var(--danger);
+  color: var(--danger-on);
+}
+
+.danger:disabled {
+  background: #F2D6DE;
+  cursor: default;
+}
+
+.link-button.danger-link {
+  color: var(--danger-text);
+  opacity: 0.8;
+  display: block;
+  margin: 0.9rem auto 0;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.link-button.danger-link:hover {
+  opacity: 1;
 }
 
 /* --- Scan page --- */
@@ -188,7 +219,7 @@ input {
 }
 
 .scanner-error {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .scan-hint {
@@ -209,7 +240,7 @@ input {
 }
 
 .scan-status-error {
-  color: var(--danger);
+  color: var(--danger-text);
   opacity: 1;
 }
 
@@ -287,13 +318,13 @@ input {
 }
 
 .debug-outcome-hit {
-  background: #E4EEE9;
-  color: var(--spine-green-dark);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .debug-outcome-miss {
-  background: #F3E7D0;
-  color: var(--foil-gold);
+  background: var(--accent-bg);
+  color: var(--accent-text);
 }
 
 .debug-outcome-duplicate {
@@ -303,8 +334,8 @@ input {
 }
 
 .debug-outcome-error {
-  background: #F6DCD4;
-  color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .debug-detail {
@@ -320,8 +351,8 @@ input {
   bottom: 4.5rem;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--spine-green-dark);
-  color: #fff;
+  background: var(--success);
+  color: var(--success-text);
   padding: 0.6rem 1.1rem;
   border-radius: 999px;
   font-size: 0.85rem;
@@ -377,11 +408,11 @@ input {
   padding: 0.6rem 0.9rem;
   font-size: 0.85rem;
   cursor: pointer;
-  color: var(--spine-green-dark);
+  color: var(--primary-dark);
 }
 
 .form-error {
-  color: var(--danger);
+  color: var(--danger-text);
   font-size: 0.85rem;
 }
 
@@ -411,7 +442,7 @@ input {
 .library-group-heading {
   font-family: var(--font-display);
   font-size: 1.1rem;
-  color: var(--spine-green-dark);
+  color: var(--primary-dark);
   border-bottom: 1px solid var(--border);
   padding-bottom: 0.35rem;
   margin-bottom: 0.6rem;
@@ -426,10 +457,22 @@ input {
   gap: 0.9rem;
 }
 
+.book-card-item {
+  list-style: none;
+}
+
 .book-card {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
 }
 
 .book-cover {
@@ -455,8 +498,8 @@ input {
   justify-content: center;
   font-family: var(--font-display);
   font-size: 1.8rem;
-  color: var(--foil-gold);
-  background: var(--spine-green-dark);
+  color: var(--primary-dark);
+  background: var(--primary);
 }
 
 .book-cover-placeholder.large {
@@ -482,4 +525,77 @@ input {
   font-size: 0.78rem;
   opacity: 0.65;
   margin: 0;
+}
+
+/* --- Edit modal (library card -> CorrectionForm) --- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 35, 35, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+  padding: 0;
+}
+
+.modal-box {
+  background: var(--parchment);
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
+.modal-heading {
+  font-family: var(--font-display);
+  color: var(--primary-dark);
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+/* --- Delete confirmation dialog --- */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 35, 35, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  padding: 1.5rem;
+}
+
+.dialog-box {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1.25rem;
+  max-width: 380px;
+}
+
+.dialog-box h2 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+  color: var(--primary-dark);
+}
+
+.dialog-box p {
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+  opacity: 0.85;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.dialog-actions .secondary,
+.dialog-actions .danger {
+  flex: 1;
 }

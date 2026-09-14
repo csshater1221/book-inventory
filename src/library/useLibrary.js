@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   increment,
@@ -69,12 +70,14 @@ export async function bumpScanCount(uid, isbn) {
  * duplicating.
  */
 export async function saveBook(uid, book) {
-  // A "local" cover's coverUrl is a blob: URL, only valid in this tab for
-  // this session — the actual photo lives in IndexedDB (see coverStorage.js),
-  // keyed by ISBN. Firestore only needs to know a local cover exists;
-  // BookCard resolves the real image on each device separately via
-  // useLocalCover, falling back to the placeholder where it's absent.
-  const coverUrl = book.coverSource === 'local' ? null : book.coverUrl || null
+  // A "photo" cover's book.coverUrl (if any) is a blob: URL, only valid
+  // in this tab for this session — the real image lives in IndexedDB
+  // (local cache) and Firestore's coverImages collection (synced source
+  // of truth), keyed by ISBN in both — see coverStorage.js/coverSync.js.
+  // The book doc itself only needs to know a photo cover exists;
+  // BookCard/CorrectionForm resolve the actual image via useCover.js,
+  // falling back to the placeholder if it's absent everywhere.
+  const coverUrl = book.coverSource === 'photo' ? null : book.coverUrl || null
 
   await setDoc(bookDoc(uid, book.isbn), {
     isbn: book.isbn,
@@ -88,4 +91,34 @@ export async function saveBook(uid, book) {
     scanCount: 1,
     createdAt: serverTimestamp()
   })
+}
+
+/**
+ * Updates an existing book's editable fields from the correction form,
+ * reused for editing a book from the library view. Deliberately uses
+ * updateDoc (not saveBook's setDoc) so it never touches createdAt or
+ * scanCount — those describe when/how often the book was first added,
+ * not this edit.
+ */
+export async function updateBook(uid, book) {
+  const coverUrl = book.coverSource === 'photo' ? null : book.coverUrl || null
+
+  await updateDoc(bookDoc(uid, book.isbn), {
+    title: book.title.trim(),
+    author: book.author.trim(),
+    series: book.series?.trim() || null,
+    volume: book.volume === '' || book.volume == null ? null : Number(book.volume),
+    coverUrl,
+    coverSource: book.coverSource || 'none'
+  })
+}
+
+/**
+ * Removes a book from the library entirely. Callers are responsible for
+ * also clearing its local cover blob (see deleteCoverLocally in
+ * coverStorage.js) if coverSource was "local" — this only touches
+ * Firestore.
+ */
+export async function deleteBook(uid, isbn) {
+  await deleteDoc(bookDoc(uid, isbn))
 }

@@ -1,16 +1,15 @@
-const DB_NAME = 'book-inventory-covers'
+const DB_NAME = 'readr-covers'
 const STORE_NAME = 'covers'
 const DB_VERSION = 1
 
 /**
- * Cover photos live in IndexedDB, keyed by ISBN, instead of a cloud
- * bucket — Firebase Storage now requires the paid Blaze plan for new
- * projects, which is off the table for this. Trade-off (agreed as
- * acceptable): a locally-taken cover only shows up on the device that
- * took it. A different device, or this one after clearing site data,
- * just falls back to the initial-letter placeholder — see BookCard /
- * useLocalCover. Firestore never stores the photo itself, only the
- * `coverSource: "local"` flag.
+ * Local IndexedDB cache for cover photos, keyed by ISBN. This is the
+ * fast path — checked before ever touching the network (see
+ * useCover.js) — but it's no longer the only copy: the source of truth
+ * now lives in Firestore (see coverSync.js), and this cache is filled in
+ * from there on a miss. Clearing site data or using a different device
+ * just means the next view re-fetches from Firestore instead of failing
+ * outright, unlike the original device-only design.
  */
 function openDb() {
   return new Promise((resolve, reject) => {

@@ -1,7 +1,7 @@
 import { groupBooks } from './groupBooks.js'
 import BookCard from './BookCard.jsx'
 
-export default function LibraryList({ books }) {
+export default function LibraryList({ books, onSelectBook }) {
   if (books.length === 0) {
     return (
       <div className="empty-state">
@@ -20,7 +20,7 @@ export default function LibraryList({ books }) {
           <h2 className="library-group-heading">{group.name}</h2>
           <ul className="book-grid">
             {group.books.map((book) => (
-              <BookCard key={book.id} book={book} />
+              <BookCard key={book.id} book={book} onSelect={onSelectBook} />
             ))}
           </ul>
         </section>
