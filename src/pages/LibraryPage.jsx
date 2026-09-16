@@ -9,10 +9,27 @@ import { useAuth } from '../auth/AuthContext.jsx'
 export default function LibraryPage({ books, loading }) {
   const { user } = useAuth()
   const [editingBook, setEditingBook] = useState(null)
+  const [query, setQuery] = useState('')
 
-  // Same autocomplete source as ScanPage — series names already present
-  // in the library, minus the book currently being edited (no point
-  // suggesting a book's own current series name back to itself).
+  // Client-side filter — the whole library's already loaded in memory for
+  // grouping/sorting (see useLibrary.js), and a personal collection is
+  // small enough that this is instant on every keystroke with no need
+  // for debouncing or a server-side query.
+  const filteredBooks = useMemo(() => {
+    const trimmed = query.trim().toLowerCase()
+    if (!trimmed) return books
+    return books.filter((book) => {
+      return (
+        book.title.toLowerCase().includes(trimmed) ||
+        (book.author ?? '').toLowerCase().includes(trimmed) ||
+        (book.series ?? '').toLowerCase().includes(trimmed)
+      )
+    })
+  }, [books, query])
+
+  // Autocomplete source stays keyed off the full library, not the
+  // filtered view — searching for "mistborn" shouldn't narrow which
+  // series names show up when editing a book you found that way.
   const existingSeriesNames = useMemo(() => {
     const names = new Set()
     for (const book of books) {
@@ -41,7 +58,33 @@ export default function LibraryPage({ books, loading }) {
 
   return (
     <div className="library-page">
-      <LibraryList books={books} onSelectBook={setEditingBook} />
+      {books.length > 0 && (
+        <div className="search-bar">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search your library"
+            aria-label="Search your library"
+          />
+          {query && (
+            <button
+              type="button"
+              className="search-clear"
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+
+      {books.length > 0 && filteredBooks.length === 0 ? (
+        <p className="empty-state">No books match "{query.trim()}".</p>
+      ) : (
+        <LibraryList books={filteredBooks} onSelectBook={setEditingBook} />
+      )}
 
       {editingBook && (
         <div className="modal-overlay" role="dialog" aria-modal="true">

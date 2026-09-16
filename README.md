@@ -1,4 +1,4 @@
-# readr
+# shelfQ
 
 Scan the ISBNs of books you own so you don't buy duplicates. A PWA — installable
 on your phone, works from a browser tab too.
@@ -29,7 +29,9 @@ on your phone, works from a browser tab too.
 - **Dedup**: scanning a book you already have shows a toast instead of
   re-asking you to fill in details.
 - **Library**: grouped by series (alphabetical), sorted by volume within a
-  series; books with no series sit in "Standalone."
+  series; books with no series sit in "Standalone." A search bar filters by
+  title, author, or series — client-side over the already-loaded library,
+  so it's instant and doesn't touch Firestore.
 - **Cover photos**: API cover if one's found; otherwise take a photo,
   resized/compressed on-device and synced through Firestore, with an
   IndexedDB cache on each device so it loads instantly once fetched once

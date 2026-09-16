@@ -1,4 +1,4 @@
-const DB_NAME = 'readr-covers'
+const DB_NAME = 'shelfq-covers'
 const STORE_NAME = 'covers'
 const DB_VERSION = 1
 

@@ -3,7 +3,7 @@
   --parchment: #F6F3FC;
   --surface: #FFFFFF;
   --border: #E1D9F0;
-  --primary: #B9A6E8;
+  --primary: #B7B0D9;
   --primary-dark: #4A3B6B;
   --primary-on: #3B2E52;
   --accent-bg: #FBEADC;
@@ -428,6 +428,46 @@ input {
 }
 
 /* --- Library --- */
+
+.search-bar {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.search-bar input[type='search'] {
+  width: 100%;
+  padding: 0.6rem 2.2rem 0.6rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.95rem;
+  color: var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-bar input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-clear {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink);
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+}
+
+.search-clear:hover {
+  opacity: 0.85;
+}
 
 .empty-state {
   text-align: center;
