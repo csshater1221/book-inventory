@@ -3,7 +3,9 @@ import BarcodeScanner from '../scanner/BarcodeScanner.jsx'
 import DebugPanel from '../scanner/DebugPanel.jsx'
 import CorrectionForm from '../correction/CorrectionForm.jsx'
 import { resolveIsbn } from '../lookup/resolveIsbn.js'
-import { findExistingBook, bumpScanCount, saveBook } from '../library/useLibrary.js'
+import { findExistingBook, bumpScanCount, saveBook, updateBook, deleteBook } from '../library/useLibrary.js'
+import { deleteCoverLocally } from '../storage/coverStorage.js'
+import { deleteCoverImage } from '../storage/coverSync.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 
 // How the scan flow is currently occupied:
@@ -13,7 +15,8 @@ import { useAuth } from '../auth/AuthContext.jsx'
 //  cooldown   - a fetch just finished (dup or lookup); camera stays
 //               paused briefly so the same barcode isn't immediately
 //               re-read while it's still in frame
-//  correcting - correction form is open for the resolved/blank draft
+//  correcting - correction form is open for the resolved/blank draft,
+//               or for an existing wishlist match (see handleScan)
 //  error      - something in the checking/lookup path failed
 const STATUS = {
   SCANNING: 'scanning',
@@ -41,6 +44,10 @@ export default function ScanPage({ books }) {
   const scannerRef = useRef(null)
   const [status, setStatus] = useState(STATUS.SCANNING)
   const [draft, setDraft] = useState(null)
+  // True when `draft` is an existing wishlist book matched by a scan
+  // (see handleScan), rather than a fresh lookup with nothing saved yet.
+  // Controls whether the form gets onDelete/a different submit label.
+  const [isEditingExisting, setIsEditingExisting] = useState(false)
   const [toast, setToast] = useState(null)
   const [errorMessage, setErrorMessage] = useState(null)
   const [debugLog, setDebugLog] = useState([])
@@ -95,6 +102,20 @@ export default function ScanPage({ books }) {
       return
     }
 
+    if (existing && existing.status === 'wishlist') {
+      // Scanning a physical copy of something already on the wishlist
+      // almost always means "I'm buying this one" — open the same
+      // edit form used from the Wishlist tab, pre-set to Owned, so
+      // confirming is a single tap. The Owned/Wishlist toggle is still
+      // right there if this was actually just "let me check whether
+      // I'd already wishlisted this."
+      logDebug(isbn, 'wishlist-match', `On wishlist: ${existing.title}`)
+      setDraft({ ...existing, status: 'owned' })
+      setIsEditingExisting(true)
+      setStatus(STATUS.CORRECTING)
+      return
+    }
+
     if (existing) {
       logDebug(isbn, 'duplicate', `Already have: ${existing.title}`)
       await bumpScanCount(user.uid, isbn).catch(() => {})
@@ -118,18 +139,37 @@ export default function ScanPage({ books }) {
 
     logDebug(isbn, result.source === 'manual' ? 'miss' : 'hit', JSON.stringify(result, null, 2))
     setDraft(result)
+    setIsEditingExisting(false)
     setStatus(STATUS.CORRECTING)
   }
 
   async function handleSave(bookData) {
-    await saveBook(user.uid, bookData)
-    showToast(`Saved: ${bookData.title}`)
+    if (isEditingExisting) {
+      await updateBook(user.uid, bookData)
+    } else {
+      await saveBook(user.uid, bookData)
+    }
+    showToast(bookData.status === 'wishlist' ? `Wishlisted: ${bookData.title}` : `Saved: ${bookData.title}`)
     setDraft(null)
+    setIsEditingExisting(false)
+    cooldownThenResume()
+  }
+
+  async function handleDeleteExisting() {
+    await deleteBook(user.uid, draft.isbn)
+    if (draft.coverSource === 'photo') {
+      await deleteCoverLocally(draft.isbn).catch(() => {})
+      await deleteCoverImage(user.uid, draft.isbn).catch(() => {})
+    }
+    showToast(`Removed: ${draft.title}`)
+    setDraft(null)
+    setIsEditingExisting(false)
     cooldownThenResume()
   }
 
   function handleCancel() {
     setDraft(null)
+    setIsEditingExisting(false)
     cooldownThenResume()
   }
 
@@ -144,6 +184,8 @@ export default function ScanPage({ books }) {
           existingSeriesNames={existingSeriesNames}
           onSave={handleSave}
           onCancel={handleCancel}
+          onDelete={isEditingExisting ? handleDeleteExisting : undefined}
+          submitLabel={isEditingExisting ? 'Save changes' : 'Save to library'}
         />
       ) : (
         <>

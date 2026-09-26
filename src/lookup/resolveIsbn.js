@@ -45,9 +45,13 @@ export async function resolveIsbn(isbn) {
  * empty. Volume number: if the catalog series string itself contains a
  * number ("Mistborn -- 3"), use that; otherwise fall back to whatever
  * parses out of the title.
+ *
+ * Exported so the wishlist text-search flow (searchBooks.js /
+ * WishlistPage) can reuse the exact same logic for a candidate that
+ * happens to have a real ISBN, instead of only guessing from the title.
  */
-async function resolveSeriesAndVolume(isbn, title) {
-  const seriesFromCatalog = await lookupSeriesName(isbn).catch(() => null)
+export async function resolveSeriesAndVolume(isbn, title) {
+  const seriesFromCatalog = isbn ? await lookupSeriesName(isbn).catch(() => null) : null
 
   if (!seriesFromCatalog) {
     return parseSeriesAndVolume(title)

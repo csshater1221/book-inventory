@@ -27,11 +27,23 @@ on your phone, works from a browser tab too.
   shows each scanned ISBN, whether it was a hit/miss/duplicate/error, and
   the raw lookup response. Session-only, not persisted.
 - **Dedup**: scanning a book you already have shows a toast instead of
-  re-asking you to fill in details.
+  re-asking you to fill in details. Scanning one that's on your
+  **wishlist** instead opens the edit form pre-set to Owned — a physical
+  copy in hand almost always means you're buying it, but the toggle's
+  right there if you were actually just checking.
 - **Library**: grouped by series (alphabetical), sorted by volume within a
   series; books with no series sit in "Standalone." A search bar filters by
   title, author, or series — client-side over the already-loaded library,
   so it's instant and doesn't touch Firestore.
+- **Wishlist**: a separate tab for books you want but don't have yet — a
+  bookstore browse with no money on you, or a friend's recommendation with
+  no physical copy (and so no barcode) at all. "Find a book" searches
+  Google Books by free text (title/author) for exactly that no-ISBN case;
+  picking a result opens the same correction form, just defaulted to
+  Wishlist instead of Owned. Every book — owned or wishlisted — lives in
+  the same `books` collection with a `status` field; the two tabs are just
+  a filter over it, so editing, covers, series grouping, and search all
+  work identically on both.
 - **Cover photos**: API cover if one's found; otherwise take a photo,
   resized/compressed on-device and synced through Firestore, with an
   IndexedDB cache on each device so it loads instantly once fetched once
@@ -109,6 +121,19 @@ firebase deploy --only hosting
 next time.) Firebase Hosting gives you a `https://your-project.web.app` URL
 — open it on your phone and use "Add to Home Screen" to install it as a PWA.
 
+> **Why redeployed changes sometimes don't show up.** `firebase.json` sets
+> `Cache-Control: no-cache` on `sw.js`, `manifest.webmanifest`, and
+> `index.html` — those three have to be re-fetched from the network on
+> every load, or the browser's own auto-update check (`registerType:
+> 'autoUpdate'` in `vite.config.js`) never even notices a new version
+> exists, since it works by comparing a freshly-fetched `sw.js` against the
+> installed one. Everything else Vite outputs gets a content hash in its
+> filename, so it's safe to cache aggressively — a code change always
+> produces a new filename for those. If you're on a build from before this
+> was added to `firebase.json`, you'll likely need to fully close the app
+> (not just background it) or clear site data once to break out of it —
+> after that, new deploys should show up on a normal reload.
+
 ## Deploying to your custom domain
 
 Since the domain is already added and verified under Hosting → Add custom
@@ -156,18 +181,19 @@ src/
 ├── auth/          Google sign-in state (AuthContext)
 ├── lookup/        ISBN → book data: Google Books, Open Library (title/
 │                  author/cover), a separate Open Library catalog-series
-│                  lookup, and the cascade that ties them together with a
-│                  title-parsing fallback
+│                  lookup, a free-text search for the wishlist's no-ISBN
+│                  case, and the cascade that ties the ISBN ones together
+│                  with a title-parsing fallback
 ├── scanner/       Camera barcode reader (html5-qrcode, EAN-13 only)
 ├── correction/    The always-shown form for confirming/fixing lookup
-│                  results, incl. series autocomplete and (for existing
-│                  books) delete-with-confirmation
+│                  results — series autocomplete, an Owned/Wishlist
+│                  toggle, and (for existing books) delete-with-confirmation
 ├── storage/       Cover photos: client-side resize/compress, an
 │                  IndexedDB local cache, and Firestore sync (its own
 │                  per-image collection, kept separate from `books`)
 ├── library/       Firestore reads/writes, and the grouping/sorting logic
-│                  for the library view
-└── pages/         Login, Scan, Library — the three screens
+│                  shared by the Library and Wishlist views
+└── pages/         Login, Scan, Library, Wishlist — the four screens
 ```
 
 ## What to extend first
@@ -176,6 +202,13 @@ src/
   through 6 of the same series back to back, retyping the series name each
   time is annoying. Remembering the last-used series (and pre-filling
   volume = previous + 1) would make that much faster.
+- **Wishlist entries with no ISBN can't be auto-matched by a later scan.**
+  A book added via "Find a book" with no ISBN found gets a synthetic key
+  (`manual-<uuid>`), not a real one. If you later scan the actual barcode,
+  it won't recognize that as the same book — it'll add a second, separate
+  owned entry with the real ISBN, leaving the wishlist one to delete by
+  hand. Matching them (by title+author, say) would close that gap, but
+  isn't foolproof the way ISBN-keyed matching is.
 - **Shared libraries.** The Firestore rules currently isolate each user
   completely — `users/{uid}/books/{isbn}` and `users/{uid}/coverImages/{isbn}`
   both check `request.auth.uid == userId`. This is exactly the piece we're

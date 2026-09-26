@@ -68,6 +68,13 @@ export async function bumpScanCount(uid, isbn) {
  * Saves a book after the user confirms/corrects it on the correction
  * screen. Keyed by ISBN so re-saving the same ISBN overwrites rather than
  * duplicating.
+ *
+ * `status` distinguishes an owned book from a wishlist entry — added so
+ * a bookstore browse or a friend's recommendation (no copy in hand yet)
+ * can be tracked the same way as a scanned book, just filtered
+ * differently in the UI (see LibraryPage/WishlistPage). Defaults to
+ * "owned" so every pre-wishlist-feature save still behaves exactly as
+ * before.
  */
 export async function saveBook(uid, book) {
   // A "photo" cover's book.coverUrl (if any) is a blob: URL, only valid
@@ -88,6 +95,7 @@ export async function saveBook(uid, book) {
     coverUrl,
     coverSource: book.coverSource || 'none',
     source: book.source,
+    status: book.status === 'wishlist' ? 'wishlist' : 'owned',
     scanCount: 1,
     createdAt: serverTimestamp()
   })
@@ -95,10 +103,12 @@ export async function saveBook(uid, book) {
 
 /**
  * Updates an existing book's editable fields from the correction form,
- * reused for editing a book from the library view. Deliberately uses
- * updateDoc (not saveBook's setDoc) so it never touches createdAt or
+ * reused for editing a book from the library/wishlist view. Deliberately
+ * uses updateDoc (not saveBook's setDoc) so it never touches createdAt or
  * scanCount — those describe when/how often the book was first added,
- * not this edit.
+ * not this edit. Includes `status` so this same function handles both
+ * ordinary edits and "mark as owned" (converting a wishlist entry once
+ * you actually buy it).
  */
 export async function updateBook(uid, book) {
   const coverUrl = book.coverSource === 'photo' ? null : book.coverUrl || null
@@ -109,16 +119,31 @@ export async function updateBook(uid, book) {
     series: book.series?.trim() || null,
     volume: book.volume === '' || book.volume == null ? null : Number(book.volume),
     coverUrl,
-    coverSource: book.coverSource || 'none'
+    coverSource: book.coverSource || 'none',
+    status: book.status === 'wishlist' ? 'wishlist' : 'owned'
   })
 }
 
 /**
  * Removes a book from the library entirely. Callers are responsible for
  * also clearing its local cover blob (see deleteCoverLocally in
- * coverStorage.js) if coverSource was "local" — this only touches
+ * coverStorage.js) if coverSource was "photo" — this only touches
  * Firestore.
  */
 export async function deleteBook(uid, isbn) {
   await deleteDoc(bookDoc(uid, isbn))
+}
+
+/**
+ * True for anything not explicitly marked "wishlist" — including every
+ * book saved before this field existed at all, which has no `status`
+ * field yet. Treating a missing status as owned means no migration
+ * write is needed for existing libraries.
+ */
+export function isOwned(book) {
+  return book.status !== 'wishlist'
+}
+
+export function isWishlist(book) {
+  return book.status === 'wishlist'
 }

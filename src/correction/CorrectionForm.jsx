@@ -12,10 +12,13 @@ import { useCover } from '../storage/useCover.js'
  * volume, so this screen is the normal path for completing that data,
  * not just an error-recovery fallback.
  *
- * Also reused for editing a book already in the library (see
- * LibraryPage): pass onDelete to enable the "Remove from library" flow,
- * and submitLabel to relabel the primary button ("Save changes" vs the
- * default "Save to library").
+ * Also reused for editing a book already in the library or wishlist
+ * (see LibraryPage/WishlistPage): pass onDelete to enable the "Remove"
+ * flow, and submitLabel to relabel the primary button ("Save changes"
+ * vs the default "Save to library"). The Owned/Wishlist toggle is what
+ * lets the same form double as "mark as owned" for a wishlist entry you
+ * end up buying, and as "actually, save this for later" for a fresh
+ * scan you don't want to commit to yet.
  */
 export default function CorrectionForm({
   uid,
@@ -30,12 +33,19 @@ export default function CorrectionForm({
   const [author, setAuthor] = useState(draft.author)
   const [series, setSeries] = useState(draft.series ?? '')
   const [volume, setVolume] = useState(draft.volume ?? '')
+  const [status, setStatus] = useState(draft.status === 'wishlist' ? 'wishlist' : 'owned')
   const [coverUrl, setCoverUrl] = useState(draft.coverUrl)
   const [coverSource, setCoverSource] = useState(draft.coverUrl ? 'api' : draft.coverSource ?? 'none')
   const [savingCover, setSavingCover] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  // A wishlist pick with no locatable ISBN gets a synthetic key (see
+  // WishlistPage) — not a real identifier worth showing the person, so
+  // the ISBN field only renders for something that actually looks like
+  // one.
+  const hasRealIsbn = /^\d{9,13}$/.test(draft.isbn ?? '')
 
   // Editing a book whose cover is a device photo: pull it in cache-first
   // (this device's IndexedDB, then the synced Firestore copy — see
@@ -89,6 +99,7 @@ export default function CorrectionForm({
         author,
         series,
         volume,
+        status,
         coverUrl,
         coverSource,
         source: draft.source
@@ -130,8 +141,32 @@ export default function CorrectionForm({
         </label>
       </div>
 
-      <label htmlFor="isbn-field">ISBN</label>
-      <input id="isbn-field" type="text" value={draft.isbn} disabled />
+      <span className="form-label">Status</span>
+      <div className="status-toggle" role="radiogroup" aria-label="Status">
+        <button
+          type="button"
+          className={status === 'owned' ? 'status-option active' : 'status-option'}
+          aria-pressed={status === 'owned'}
+          onClick={() => setStatus('owned')}
+        >
+          Owned
+        </button>
+        <button
+          type="button"
+          className={status === 'wishlist' ? 'status-option active' : 'status-option'}
+          aria-pressed={status === 'wishlist'}
+          onClick={() => setStatus('wishlist')}
+        >
+          Wishlist
+        </button>
+      </div>
+
+      {hasRealIsbn && (
+        <>
+          <label htmlFor="isbn-field">ISBN</label>
+          <input id="isbn-field" type="text" value={draft.isbn} disabled />
+        </>
+      )}
 
       <label htmlFor="title-field">Title</label>
       <input
@@ -182,7 +217,7 @@ export default function CorrectionForm({
           className="link-button danger-link"
           onClick={() => setConfirmingDelete(true)}
         >
-          Remove this book from your library
+          Remove this book
         </button>
       )}
 

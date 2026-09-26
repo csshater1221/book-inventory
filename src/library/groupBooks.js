@@ -8,25 +8,38 @@ const STANDALONE_LABEL = 'Standalone'
  *  - books within a series by volume ascending (nulls last)
  *  - books within Standalone alphabetically by title
  *
+ * Grouping itself is case-insensitive — "Mistborn" and "mistborn" land in
+ * the same group, since series names are typed by hand (or guessed by
+ * parseSeriesAndVolume.js) and easy to enter with different casing across
+ * different scans of the same series. The display name shown as the
+ * group heading is whichever casing was seen first among that series'
+ * books; it doesn't need to be authoritative, since editing any book's
+ * series field to fix the casing is a normal part of using the app.
+ *
  * Returns an array of { name, books } ready to render as sections.
  */
 export function groupBooks(books) {
-  const groups = new Map()
+  const groups = new Map() // normalized key -> { displayName, books }
 
   for (const book of books) {
-    const key = book.series?.trim() || STANDALONE_LABEL
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(book)
+    const rawSeries = book.series?.trim()
+    const displayName = rawSeries || STANDALONE_LABEL
+    const key = displayName.toLowerCase()
+
+    if (!groups.has(key)) {
+      groups.set(key, { displayName, books: [] })
+    }
+    groups.get(key).books.push(book)
   }
 
-  const sortedGroupNames = [...groups.keys()].sort((a, b) =>
+  const sortedKeys = [...groups.keys()].sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: 'base' })
   )
 
-  return sortedGroupNames.map((name) => {
-    const groupBooksList = groups.get(name)
+  return sortedKeys.map((key) => {
+    const { displayName, books: groupBooksList } = groups.get(key)
 
-    if (name === STANDALONE_LABEL) {
+    if (key === STANDALONE_LABEL.toLowerCase()) {
       groupBooksList.sort((a, b) =>
         a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
       )
@@ -41,6 +54,6 @@ export function groupBooks(books) {
       })
     }
 
-    return { name, books: groupBooksList }
+    return { name: displayName, books: groupBooksList }
   })
 }
