@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetchWithTimeout.js'
 /**
  * Looks up a book by ISBN via the Open Library Books API.
  * Returns a normalized result, or null if there's no usable hit.
@@ -13,7 +14,7 @@ export async function lookupOpenLibrary(isbn) {
 
   let res
   try {
-    res = await fetch(url.toString())
+    res = await fetchWithTimeout(url.toString())
   } catch (err) {
     console.warn('Open Library request failed', err)
     return null

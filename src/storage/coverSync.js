@@ -1,5 +1,6 @@
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../firebase.js'
+import { queuedWrite } from '../library/queuedWrite.js'
 
 /**
  * Stores/retrieves cover photos as base64 in their own per-image doc —
@@ -22,7 +23,7 @@ function coverImageDoc(uid, isbn) {
 }
 
 export async function uploadCoverImage(uid, isbn, dataUrl) {
-  await setDoc(coverImageDoc(uid, isbn), { dataUrl, updatedAt: Date.now() })
+  await queuedWrite(setDoc(coverImageDoc(uid, isbn), { dataUrl, updatedAt: Date.now() }))
 }
 
 export async function fetchCoverImage(uid, isbn) {
@@ -31,5 +32,5 @@ export async function fetchCoverImage(uid, isbn) {
 }
 
 export async function deleteCoverImage(uid, isbn) {
-  await deleteDoc(coverImageDoc(uid, isbn))
+  await queuedWrite(deleteDoc(coverImageDoc(uid, isbn)))
 }

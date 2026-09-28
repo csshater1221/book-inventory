@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import ScanPage from './pages/ScanPage.jsx'
 import LibraryPage from './pages/LibraryPage.jsx'
 import WishlistPage from './pages/WishlistPage.jsx'
+import { useOnlineStatus } from './offline/useOnlineStatus.js'
 
 export default function App() {
   const { user, loading, logout } = useAuth()
@@ -22,7 +23,8 @@ export default function App() {
 }
 
 function SignedInApp({ user, logout }) {
-  const { books, loading: booksLoading } = useLibrary(user.uid)
+  const { books, loading: booksLoading, pendingCount } = useLibrary(user.uid)
+  const online = useOnlineStatus()
 
   const ownedCount = useMemo(() => books.filter(isOwned).length, [books])
   const wishlistCount = useMemo(() => books.filter(isWishlist).length, [books])
@@ -36,10 +38,21 @@ function SignedInApp({ user, logout }) {
         </button>
       </header>
 
+      {!online && (
+        <div className="status-banner offline" role="status">
+          Offline — showing your saved library. Changes will sync when you reconnect.
+        </div>
+      )}
+      {online && pendingCount > 0 && (
+        <div className="status-banner syncing" role="status">
+          Syncing {pendingCount} {pendingCount === 1 ? 'change' : 'changes'}…
+        </div>
+      )}
+
       <main className="app-main">
         <Routes>
           <Route path="/" element={<Navigate to="/scan" replace />} />
-          <Route path="/scan" element={<ScanPage books={books} />} />
+          <Route path="/scan" element={<ScanPage books={books} loading={booksLoading} />} />
           <Route path="/library" element={<LibraryPage books={books} loading={booksLoading} />} />
           <Route path="/wishlist" element={<WishlistPage books={books} loading={booksLoading} />} />
         </Routes>

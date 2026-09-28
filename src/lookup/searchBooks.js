@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetchWithTimeout.js'
 const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
 
 /**
@@ -19,7 +20,7 @@ export async function searchBooksByText(query) {
   url.searchParams.set('maxResults', '8')
   if (API_KEY) url.searchParams.set('key', API_KEY)
 
-  const res = await fetch(url.toString())
+  const res = await fetchWithTimeout(url.toString())
   if (!res.ok) {
     throw new Error(`Google Books search failed (${res.status})`)
   }

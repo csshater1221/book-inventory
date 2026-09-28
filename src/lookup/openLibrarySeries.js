@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetchWithTimeout.js'
 /**
  * Best-effort fetch of a human-readable series name for this ISBN, using
  * Open Library's per-edition record — a different endpoint than the one
@@ -15,7 +16,7 @@
 export async function lookupSeriesName(isbn) {
   let res
   try {
-    res = await fetch(`https://openlibrary.org/isbn/${isbn}.json`)
+    res = await fetchWithTimeout(`https://openlibrary.org/isbn/${isbn}.json`)
   } catch (err) {
     console.warn('Open Library edition request failed', err)
     return null

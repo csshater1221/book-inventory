@@ -74,7 +74,11 @@ export default function WishlistPage({ books, loading }) {
       setSearchResults(results)
     } catch (err) {
       console.error('Book search failed', err)
-      setSearchError('Search failed — check your connection and try again.')
+      setSearchError(
+        navigator.onLine
+          ? 'Search failed — check your connection and try again.'
+          : "You're offline — finding a book by title needs a connection."
+      )
       setSearchResults(null)
     } finally {
       setSearching(false)

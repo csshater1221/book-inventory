@@ -39,7 +39,7 @@ function timestamp() {
   return new Date().toLocaleTimeString([], { hour12: false })
 }
 
-export default function ScanPage({ books }) {
+export default function ScanPage({ books, loading: booksLoading }) {
   const { user } = useAuth()
   const scannerRef = useRef(null)
   const [status, setStatus] = useState(STATUS.SCANNING)
@@ -90,16 +90,25 @@ export default function ScanPage({ books }) {
     setErrorMessage(null)
     setStatus(STATUS.CHECKING)
 
+    // Check the library that's already loaded on this device — no network
+    // round trip, so "do I already own this?" answers instantly even with
+    // no signal (the whole library is served from Firestore's local copy
+    // when offline). Only if that hasn't finished loading yet do we fall
+    // back to asking Firestore directly.
     let existing
-    try {
-      existing = await findExistingBook(user.uid, isbn)
-    } catch (err) {
-      console.error('Dedup check failed', err)
-      logDebug(isbn, 'error', String(err))
-      setErrorMessage("Couldn't check your library — check your connection.")
-      setStatus(STATUS.ERROR)
-      cooldownThenResume()
-      return
+    if (booksLoading) {
+      try {
+        existing = await findExistingBook(user.uid, isbn)
+      } catch (err) {
+        console.error('Dedup check failed', err)
+        logDebug(isbn, 'error', String(err))
+        setErrorMessage("Couldn't check your library — check your connection.")
+        setStatus(STATUS.ERROR)
+        cooldownThenResume()
+        return
+      }
+    } else {
+      existing = books.find((book) => book.isbn === isbn) ?? null
     }
 
     if (existing && existing.status === 'wishlist') {
@@ -118,7 +127,7 @@ export default function ScanPage({ books }) {
 
     if (existing) {
       logDebug(isbn, 'duplicate', `Already have: ${existing.title}`)
-      await bumpScanCount(user.uid, isbn).catch(() => {})
+      bumpScanCount(user.uid, isbn).catch(() => {})
       showToast(`Already in your library: ${existing.title}`)
       cooldownThenResume()
       return
@@ -138,6 +147,9 @@ export default function ScanPage({ books }) {
     }
 
     logDebug(isbn, result.source === 'manual' ? 'miss' : 'hit', JSON.stringify(result, null, 2))
+    if (result.source === 'manual' && !navigator.onLine) {
+      showToast("You're offline — enter the details by hand")
+    }
     setDraft(result)
     setIsEditingExisting(false)
     setStatus(STATUS.CORRECTING)

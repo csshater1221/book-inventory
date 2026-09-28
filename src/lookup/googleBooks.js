@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetchWithTimeout.js'
 const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
 
 /**
@@ -15,7 +16,7 @@ export async function lookupGoogleBooks(isbn) {
 
   let res
   try {
-    res = await fetch(url.toString())
+    res = await fetchWithTimeout(url.toString())
   } catch (err) {
     // Network failure — treat as a miss so the cascade continues.
     console.warn('Google Books request failed', err)

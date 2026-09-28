@@ -37,6 +37,12 @@ const BarcodeScanner = forwardRef(function BarcodeScanner({ onScan, active }, re
   // available — the intent to restore after backgrounding, separate from
   // whether the camera happens to exist right now.
   const wantsToScanRef = useRef(true)
+  // The camera effect below only re-runs when active/visible change, so a
+  // plain `onScan` captured inside it would go stale — it'd keep calling
+  // the first render's handler, along with whatever library data that
+  // render saw. Always call through this ref to get the latest one.
+  const onScanRef = useRef(onScan)
+  onScanRef.current = onScan
   const [error, setError] = useState(null)
   const [visible, setVisible] = useState(!document.hidden)
 
@@ -98,7 +104,7 @@ const BarcodeScanner = forwardRef(function BarcodeScanner({ onScan, active }, re
           isRunningRef.current = false
           wantsToScanRef.current = false
           scanner.pause(true)
-          onScan(decodedText)
+          onScanRef.current(decodedText)
         },
         () => {
           // Per-frame "nothing decoded" callback — expected constantly,

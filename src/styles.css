@@ -735,3 +735,22 @@ input {
 .dialog-actions .danger {
   flex: 1;
 }
+
+/* --- Offline / sync status banner --- */
+
+.status-banner {
+  padding: 0.45rem 1.25rem;
+  font-size: 0.8rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.status-banner.offline {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.status-banner.syncing {
+  background: var(--success-bg);
+  color: var(--success-text);
+}

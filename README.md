@@ -44,6 +44,8 @@ on your phone, works from a browser tab too.
   the same `books` collection with a `status` field; the two tabs are just
   a filter over it, so editing, covers, series grouping, and search all
   work identically on both.
+- **Offline support**: the app opens and works with no connection — see
+  the "Offline support" section below for exactly what does and doesn't.
 - **Cover photos**: API cover if one's found; otherwise take a photo,
   resized/compressed on-device and synced through Firestore, with an
   IndexedDB cache on each device so it loads instantly once fetched once
@@ -174,6 +176,43 @@ On your phone, you'll need the deployed `https://` URL (or a tunnel like
 `ngrok`) since `localhost` on your laptop isn't reachable from your phone's
 camera.
 
+## Offline support
+
+Built for standing in a bookstore with one bar of signal.
+
+**Works offline:**
+- Opening the app (the app shell is precached by the service worker).
+- Browsing and searching your Library and Wishlist — Firestore keeps a
+  persistent copy of your books in IndexedDB (`src/firebase.js`), and the
+  listener in `useLibrary.js` serves from it instantly.
+- "Do I already own this?" — a scan is checked against the library already
+  loaded on the device, not the network, so it answers immediately.
+- Adding, editing, and deleting books. Changes show up right away and are
+  queued; they upload automatically when the connection returns. A banner
+  shows "Offline" and, once you're back, "Syncing N changes…".
+- Camera scanning, and covers you've already viewed (thumbnails are cached by
+  the service worker; your own photos by IndexedDB).
+
+**Needs a connection:**
+- Looking up a *new* book's title/author/cover. Offline, a scan of a book
+  you don't have opens the form blank so you can type the details by hand.
+  Lookups also give up after 5 seconds each, so a flaky connection gets you
+  to the form instead of an endless spinner.
+- "Find a book" on the Wishlist tab (it searches Google Books).
+- Signing in the first time. Once you have, the session persists and the app
+  stays signed in offline.
+- Photo covers you've never opened on this device.
+
+**Good to know:**
+- Open the app online at least once after each deploy so the service worker
+  can cache the new version — offline support can't kick in before that.
+- Queued changes live in the browser's storage on that device. If you clear
+  site data before they've synced, they're gone; installed PWAs are far less
+  likely to be evicted than a plain browser tab.
+- `navigator.onLine` only knows the device has a network, not that the
+  internet is reachable, which is why writes and lookups use short timeouts
+  (`queuedWrite.js`, `fetchWithTimeout.js`) rather than trusting it alone.
+
 ## Project structure
 
 ```
@@ -191,8 +230,10 @@ src/
 ├── storage/       Cover photos: client-side resize/compress, an
 │                  IndexedDB local cache, and Firestore sync (its own
 │                  per-image collection, kept separate from `books`)
-├── library/       Firestore reads/writes, and the grouping/sorting logic
-│                  shared by the Library and Wishlist views
+├── library/       Firestore reads/writes (with queued, offline-safe
+│                  writes), and the grouping/sorting logic shared by
+│                  the Library and Wishlist views
+├── offline/       Online/offline status hook for the banner
 └── pages/         Login, Scan, Library, Wishlist — the four screens
 ```
 
@@ -202,6 +243,10 @@ src/
   through 6 of the same series back to back, retyping the series name each
   time is annoying. Remembering the last-used series (and pre-filling
   volume = previous + 1) would make that much faster.
+- **Queue lookups while offline.** Right now a new book scanned offline means
+  typing its details by hand. Saving just the ISBN and filling in
+  title/author/cover automatically the next time you're online would make
+  offline shelf-scanning much less tedious.
 - **Wishlist entries with no ISBN can't be auto-matched by a later scan.**
   A book added via "Find a book" with no ISBN found gets a synthetic key
   (`manual-<uuid>`), not a real one. If you later scan the actual barcode,

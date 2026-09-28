@@ -11,6 +11,7 @@ import {
   updateDoc
 } from 'firebase/firestore'
 import { db } from '../firebase.js'
+import { queuedWrite } from './queuedWrite.js'
 
 function booksCollection(uid) {
   return collection(db, 'users', uid, 'books')
@@ -25,25 +26,42 @@ function bookDoc(uid, isbn) {
  * The library is small (a personal collection, not a store catalog), so
  * loading the whole thing client-side and grouping/sorting in memory
  * (see groupBooks.js) is simpler than paginated queries.
+ *
+ * With offline persistence on (see firebase.js) the first snapshot comes
+ * from the local copy on this device, so the library appears instantly —
+ * and keeps working with no connection at all. `pendingCount` is how many
+ * books have changes made on this device that the server hasn't
+ * acknowledged yet (i.e. still waiting to sync).
  */
 export function useLibrary(uid) {
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
     if (!uid) {
       setBooks([])
       setLoading(false)
+      setPendingCount(0)
       return
     }
-    const unsubscribe = onSnapshot(booksCollection(uid), (snapshot) => {
-      setBooks(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })))
-      setLoading(false)
-    })
+    const unsubscribe = onSnapshot(
+      booksCollection(uid),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        setBooks(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })))
+        setPendingCount(snapshot.docs.filter((d) => d.metadata.hasPendingWrites).length)
+        setLoading(false)
+      },
+      (err) => {
+        console.error('Library listener failed', err)
+        setLoading(false)
+      }
+    )
     return unsubscribe
   }, [uid])
 
-  return { books, loading }
+  return { books, loading, pendingCount }
 }
 
 /**
@@ -61,7 +79,7 @@ export async function findExistingBook(uid, isbn) {
  * UI — it exists only in case it's useful later (e.g. "most re-scanned").
  */
 export async function bumpScanCount(uid, isbn) {
-  await updateDoc(bookDoc(uid, isbn), { scanCount: increment(1) })
+  await queuedWrite(updateDoc(bookDoc(uid, isbn), { scanCount: increment(1) }))
 }
 
 /**
@@ -86,7 +104,7 @@ export async function saveBook(uid, book) {
   // falling back to the placeholder if it's absent everywhere.
   const coverUrl = book.coverSource === 'photo' ? null : book.coverUrl || null
 
-  await setDoc(bookDoc(uid, book.isbn), {
+  await queuedWrite(setDoc(bookDoc(uid, book.isbn), {
     isbn: book.isbn,
     title: book.title.trim(),
     author: book.author.trim(),
@@ -98,7 +116,7 @@ export async function saveBook(uid, book) {
     status: book.status === 'wishlist' ? 'wishlist' : 'owned',
     scanCount: 1,
     createdAt: serverTimestamp()
-  })
+  }))
 }
 
 /**
@@ -113,7 +131,7 @@ export async function saveBook(uid, book) {
 export async function updateBook(uid, book) {
   const coverUrl = book.coverSource === 'photo' ? null : book.coverUrl || null
 
-  await updateDoc(bookDoc(uid, book.isbn), {
+  await queuedWrite(updateDoc(bookDoc(uid, book.isbn), {
     title: book.title.trim(),
     author: book.author.trim(),
     series: book.series?.trim() || null,
@@ -121,7 +139,7 @@ export async function updateBook(uid, book) {
     coverUrl,
     coverSource: book.coverSource || 'none',
     status: book.status === 'wishlist' ? 'wishlist' : 'owned'
-  })
+  }))
 }
 
 /**
@@ -131,7 +149,7 @@ export async function updateBook(uid, book) {
  * Firestore.
  */
 export async function deleteBook(uid, isbn) {
-  await deleteDoc(bookDoc(uid, isbn))
+  await queuedWrite(deleteDoc(bookDoc(uid, isbn)))
 }
 
 /**
